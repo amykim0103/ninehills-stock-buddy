@@ -8,25 +8,28 @@ import { Navigate } from "react-router-dom";
 import { Item, OrderLine } from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { formatKoreanDate, formatQty } from "@/lib/utils-date";
+import { formatKoreanDate, formatQty, getSundayOfWeek } from "@/lib/utils-date";
 import { toast } from "sonner";
 import { Send, ShoppingCart, AlertCircle, Sparkles, Package } from "lucide-react";
 
 export default function OwnerDashboard() {
   const { role } = useSession();
-  const { items, getCurrentSubmission, ensureCurrentSubmission, saveOrders } = useStore();
+  const items = useStore((s) => s.items);
+  const saveOrders = useStore((s) => s.saveOrders);
+  const ensureCurrentSubmission = useStore((s) => s.ensureCurrentSubmission);
 
-  const [submissionId, setSubmissionId] = useState<string>("");
-  const [orderQty, setOrderQty] = useState<Record<string, string>>({});
-
+  // 마운트 시 이번 주 submission 보장 (없으면 생성)
   useEffect(() => {
-    const id = ensureCurrentSubmission();
-    setSubmissionId(id);
+    ensureCurrentSubmission();
   }, [ensureCurrentSubmission]);
 
+  // 항상 store에서 직접 이번 주 submission을 구독 — 매니저가 저장하면 즉시 반영
+  const weekDate = getSundayOfWeek();
   const submission = useStore((s) =>
-    s.submissions.find((x) => x.id === submissionId)
+    s.submissions.find((x) => x.weekDate === weekDate)
   );
+
+  const [orderQty, setOrderQty] = useState<Record<string, string>>({});
 
   // 기존 발주 prefill
   useEffect(() => {
