@@ -73,6 +73,7 @@ function Detail({
   onBack: () => void;
 }) {
   const stockEntries = Object.entries(sub.stock);
+  const needOrderEntries = Object.entries(sub.needOrderFlags ?? {}).filter(([, v]) => v);
   const orderedItems = sub.orders.filter((o) => o.orderQty > 0);
 
   return (
@@ -115,6 +116,25 @@ function Detail({
           })}
         </div>
       </Section>
+
+      {needOrderEntries.length > 0 && (
+        <Section
+          icon={<Package className="w-4 h-4" />}
+          title={`주문필요 (${needOrderEntries.length})`}
+        >
+          <div className="space-y-1.5">
+            {needOrderEntries.map(([id]) => {
+              const it = items.find((x) => x.id === id);
+              return (
+                <div key={id} className="flex justify-between text-sm">
+                  <span className="truncate flex-1">{it?.name ?? "삭제된 품목"}</span>
+                  <span className="text-accent font-semibold ml-2">주문필요</span>
+                </div>
+              );
+            })}
+          </div>
+        </Section>
+      )}
 
       {orderedItems.length > 0 && (
         <Section icon={<ShoppingCart className="w-4 h-4" />} title={`발주 (${orderedItems.length})`}>

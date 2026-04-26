@@ -1,7 +1,7 @@
 import { useState } from "react";
 import AppShell from "@/components/AppShell";
 import { useStore } from "@/lib/store";
-import { CATEGORIES, CategoryKey } from "@/lib/types";
+import { CATEGORIES, CategoryKey, ItemType } from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,14 +31,17 @@ export default function ItemsManagement() {
   const [name, setName] = useState("");
   const [cat, setCat] = useState<CategoryKey>("시럽");
   const [safety, setSafety] = useState("");
+  const [newType, setNewType] = useState<ItemType>("quantity");
 
   const visible = items.filter((i) => (showInactive ? true : i.active));
 
   const handleAdd = () => {
     if (!name.trim()) return toast.error("품목명을 입력해주세요");
-    addItem(name, cat, parseInt(safety || "0", 10) || 0);
+    const safetyNum = newType === "needOrder" ? 0 : parseInt(safety || "0", 10) || 0;
+    addItem(name, cat, safetyNum, newType);
     setName("");
     setSafety("");
+    setNewType("quantity");
     setOpen(false);
     toast.success(`${name} 추가됨`);
   };
@@ -84,13 +87,24 @@ export default function ItemsManagement() {
                   ))}
                 </SelectContent>
               </Select>
-              <Input
-                type="number"
-                inputMode="numeric"
-                placeholder="안전재고 (선택)"
-                value={safety}
-                onChange={(e) => setSafety(e.target.value)}
-              />
+              <Select value={newType} onValueChange={(v) => setNewType(v as ItemType)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="quantity">수량형 (숫자 입력)</SelectItem>
+                  <SelectItem value="needOrder">주문필요형 (토글)</SelectItem>
+                </SelectContent>
+              </Select>
+              {newType === "quantity" && (
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  placeholder="안전재고 (선택)"
+                  value={safety}
+                  onChange={(e) => setSafety(e.target.value)}
+                />
+              )}
             </div>
             <DialogFooter>
               <Button onClick={handleAdd} className="w-full bg-primary text-primary-foreground">
@@ -113,18 +127,41 @@ export default function ItemsManagement() {
             <div className="flex items-center gap-3">
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium truncate">{it.name}</div>
-                <div className="text-[11px] text-muted-foreground mt-1 flex items-center gap-2">
-                  <span>안전재고</span>
-                  <Input
-                    type="number"
-                    inputMode="numeric"
-                    value={it.safetyStock || ""}
-                    placeholder="0"
-                    onChange={(e) =>
-                      updateItem(it.id, { safetyStock: parseInt(e.target.value || "0", 10) || 0 })
+                <div className="mt-1.5 flex items-center gap-2">
+                  <Select
+                    value={it.type ?? "quantity"}
+                    onValueChange={(v) =>
+                      updateItem(it.id, {
+                        type: v as ItemType,
+                        ...(v === "needOrder" ? { safetyStock: 0 } : {}),
+                      })
                     }
-                    className="w-16 h-7 text-center bg-card text-xs"
-                  />
+                  >
+                    <SelectTrigger className="h-7 w-[120px] text-[11px] bg-card">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="quantity">수량형</SelectItem>
+                      <SelectItem value="needOrder">주문필요형</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {(it.type ?? "quantity") === "quantity" && (
+                    <div className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+                      <span>안전</span>
+                      <Input
+                        type="number"
+                        inputMode="numeric"
+                        value={it.safetyStock || ""}
+                        placeholder="0"
+                        onChange={(e) =>
+                          updateItem(it.id, {
+                            safetyStock: parseInt(e.target.value || "0", 10) || 0,
+                          })
+                        }
+                        className="w-14 h-7 text-center bg-card text-xs"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="flex flex-col items-end gap-1">

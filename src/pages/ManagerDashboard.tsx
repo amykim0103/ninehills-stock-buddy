@@ -7,6 +7,7 @@ import { Item } from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { formatKoreanDate, normalizeQty } from "@/lib/utils-date";
 import { toast } from "sonner";
 import { CheckCircle2, MessageSquarePlus, Truck, PackageCheck } from "lucide-react";
@@ -22,6 +23,7 @@ export default function ManagerDashboard() {
 
   const [submissionId, setSubmissionId] = useState<string>("");
   const [qty, setQty] = useState<Record<string, string>>({});
+  const [needOrder, setNeedOrder] = useState<Record<string, boolean>>({});
   const [memos, setMemos] = useState<Record<string, string>>({});
   const [showMemoFor, setShowMemoFor] = useState<string | null>(null);
   const [generalMemo, setGeneralMemo] = useState("");
@@ -32,6 +34,7 @@ export default function ManagerDashboard() {
     const sub = getSubmission(id);
     if (sub) {
       setQty(Object.fromEntries(Object.entries(sub.stock).map(([k, v]) => [k, String(v)])));
+      setNeedOrder(sub.needOrderFlags ?? {});
       setMemos(sub.itemMemos);
       setGeneralMemo(sub.generalMemo);
     }
@@ -51,11 +54,16 @@ export default function ManagerDashboard() {
   const handleSave = () => {
     if (!submissionId) return;
     const stock: Record<string, number> = {};
+    const flags: Record<string, boolean> = {};
     for (const it of activeItems) {
-      const v = numericQty(it.id);
-      if (qty[it.id] !== undefined && qty[it.id] !== "") stock[it.id] = v;
+      if (it.type === "needOrder") {
+        if (needOrder[it.id]) flags[it.id] = true;
+      } else {
+        const v = numericQty(it.id);
+        if (qty[it.id] !== undefined && qty[it.id] !== "") stock[it.id] = v;
+      }
     }
-    saveStockEntry(submissionId, stock, memos, generalMemo);
+    saveStockEntry(submissionId, stock, flags, memos, generalMemo);
     toast.success("재고가 저장되었습니다");
   };
 
@@ -66,8 +74,15 @@ export default function ManagerDashboard() {
   };
 
   const renderItem = (it: Item) => {
+    const isNeedOrder = it.type === "needOrder";
     const v = numericQty(it.id);
-    const below = it.safetyStock > 0 && qty[it.id] !== undefined && qty[it.id] !== "" && v < it.safetyStock;
+    const below =
+      !isNeedOrder &&
+      it.safetyStock > 0 &&
+      qty[it.id] !== undefined &&
+      qty[it.id] !== "" &&
+      v < it.safetyStock;
+    const flagged = isNeedOrder && !!needOrder[it.id];
     const isOpen = showMemoFor === it.id;
     return (
       <div
@@ -78,24 +93,44 @@ export default function ManagerDashboard() {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm font-medium truncate">{it.name}</span>
-              {below && <NeedBuyBadge />}
+              {(below || flagged) && <NeedBuyBadge />}
             </div>
-            {it.safetyStock > 0 && (
+            {isNeedOrder ? (
               <div className="text-[11px] text-muted-foreground mt-0.5">
-                안전재고 {it.safetyStock}
+                주문필요형
               </div>
+            ) : (
+              it.safetyStock > 0 && (
+                <div className="text-[11px] text-muted-foreground mt-0.5">
+                  안전재고 {it.safetyStock}
+                </div>
+              )
             )}
           </div>
-          <Input
-            type="number"
-            inputMode="decimal"
-            step="0.1"
-            min="0"
-            placeholder="0"
-            value={qty[it.id] ?? ""}
-            onChange={(e) => setQty((q) => ({ ...q, [it.id]: e.target.value }))}
-            className="w-20 h-11 text-center text-base font-semibold bg-card"
-          />
+          {isNeedOrder ? (
+            <div className="flex flex-col items-center gap-1 w-20">
+              <Switch
+                checked={!!needOrder[it.id]}
+                onCheckedChange={(checked) =>
+                  setNeedOrder((m) => ({ ...m, [it.id]: checked }))
+                }
+              />
+              <span className="text-[10px] text-muted-foreground">
+                {needOrder[it.id] ? "주문필요" : "충분"}
+              </span>
+            </div>
+          ) : (
+            <Input
+              type="number"
+              inputMode="decimal"
+              step="0.1"
+              min="0"
+              placeholder="0"
+              value={qty[it.id] ?? ""}
+              onChange={(e) => setQty((q) => ({ ...q, [it.id]: e.target.value }))}
+              className="w-20 h-11 text-center text-base font-semibold bg-card"
+            />
+          )}
           <button
             type="button"
             onClick={() => setShowMemoFor(isOpen ? null : it.id)}
