@@ -12,12 +12,12 @@ export default function History() {
   const { submissions, items } = useStore();
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  if (!role) return <Navigate to="/" replace />;
-
   const sorted = useMemo(
     () => [...submissions].sort((a, b) => b.weekDate.localeCompare(a.weekDate)),
     [submissions]
   );
+
+  if (!role) return <Navigate to="/" replace />;
 
   if (selectedId) {
     const sub = submissions.find((s) => s.id === selectedId);
