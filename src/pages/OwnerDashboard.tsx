@@ -57,6 +57,9 @@ export default function OwnerDashboard() {
   const needBuyItems = useMemo(() => {
     if (!submission) return [] as Item[];
     return activeItems.filter((it) => {
+      if (it.type === "needOrder") {
+        return !!submission.needOrderFlags?.[it.id];
+      }
       const v = submission.stock[it.id];
       return it.safetyStock > 0 && v !== undefined && v < it.safetyStock;
     });
@@ -79,9 +82,11 @@ export default function OwnerDashboard() {
   };
 
   const renderItem = (it: Item) => {
+    const isNeedOrder = it.type === "needOrder";
+    const flagged = isNeedOrder && !!submission?.needOrderFlags?.[it.id];
     const stock = submission?.stock[it.id];
-    const hasStock = stock !== undefined;
-    const below = it.safetyStock > 0 && hasStock && stock! < it.safetyStock;
+    const hasStock = !isNeedOrder && stock !== undefined;
+    const below = !isNeedOrder && it.safetyStock > 0 && hasStock && stock! < it.safetyStock;
     const rec = hasStock ? recommendOrderQty(stock!, it.safetyStock) : 0;
     const itemMemo = submission?.itemMemos[it.id];
 
@@ -91,27 +96,35 @@ export default function OwnerDashboard() {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm font-medium truncate">{it.name}</span>
-              {below && <NeedBuyBadge />}
+              {(below || flagged) && <NeedBuyBadge />}
             </div>
-            <div className="text-[11px] text-muted-foreground mt-0.5 flex gap-2">
-              <span>현재 {hasStock ? formatQty(stock!) : "-"}</span>
-              <span>·</span>
-              <span>안전 {it.safetyStock || "-"}</span>
-              {rec > 0 && (
-                <span className="text-accent font-semibold">· 추천 {rec}</span>
-              )}
-            </div>
+            {isNeedOrder ? (
+              <div className="text-[11px] text-muted-foreground mt-0.5">
+                주문필요형 · {flagged ? "주문 필요" : "충분"}
+              </div>
+            ) : (
+              <div className="text-[11px] text-muted-foreground mt-0.5 flex gap-2">
+                <span>현재 {hasStock ? formatQty(stock!) : "-"}</span>
+                <span>·</span>
+                <span>안전 {it.safetyStock || "-"}</span>
+                {rec > 0 && (
+                  <span className="text-accent font-semibold">· 추천 {rec}</span>
+                )}
+              </div>
+            )}
           </div>
-          <Input
-            type="number"
-            inputMode="decimal"
-            step="0.1"
-            min="0"
-            placeholder="발주"
-            value={orderQty[it.id] ?? ""}
-            onChange={(e) => setOrderQty((q) => ({ ...q, [it.id]: e.target.value }))}
-            className="w-20 h-11 text-center text-base font-semibold bg-card"
-          />
+          {!isNeedOrder && (
+            <Input
+              type="number"
+              inputMode="decimal"
+              step="0.1"
+              min="0"
+              placeholder="발주"
+              value={orderQty[it.id] ?? ""}
+              onChange={(e) => setOrderQty((q) => ({ ...q, [it.id]: e.target.value }))}
+              className="w-20 h-11 text-center text-base font-semibold bg-card"
+            />
+          )}
         </div>
         {itemMemo && (
           <div className="mt-2 text-[11px] text-muted-foreground italic px-2 py-1 rounded bg-secondary/60">
