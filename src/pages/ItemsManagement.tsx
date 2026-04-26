@@ -125,9 +125,37 @@ export default function ItemsManagement() {
             }`}
           >
             <div className="flex items-center gap-3">
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium truncate">{it.name}</div>
-                <div className="mt-1.5 flex items-center gap-2">
+              <div className="flex-1 min-w-0 space-y-1.5">
+                <Input
+                  value={it.name}
+                  onChange={(e) => updateItem(it.id, { name: e.target.value })}
+                  onBlur={(e) => {
+                    const trimmed = e.target.value.trim();
+                    if (!trimmed) {
+                      updateItem(it.id, { name: it.name });
+                      toast.error("품목명은 비울 수 없습니다");
+                    } else if (trimmed !== e.target.value) {
+                      updateItem(it.id, { name: trimmed });
+                    }
+                  }}
+                  className="h-8 text-sm font-medium bg-card"
+                />
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Select
+                    value={it.category}
+                    onValueChange={(v) => updateItem(it.id, { category: v as CategoryKey })}
+                  >
+                    <SelectTrigger className="h-7 w-[130px] text-[11px] bg-card">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CATEGORIES.map((c) => (
+                        <SelectItem key={c} value={c}>
+                          {c}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Select
                     value={it.type ?? "quantity"}
                     onValueChange={(v) =>
@@ -137,7 +165,7 @@ export default function ItemsManagement() {
                       })
                     }
                   >
-                    <SelectTrigger className="h-7 w-[120px] text-[11px] bg-card">
+                    <SelectTrigger className="h-7 w-[110px] text-[11px] bg-card">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
