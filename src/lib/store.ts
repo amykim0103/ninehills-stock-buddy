@@ -169,7 +169,7 @@ export const useStore = create<Store>()(
     }),
     {
       name: "ninehill-inventory-v1",
-      version: 2,
+      version: 3,
       migrate: (persisted: any, version) => {
         if (!persisted) return persisted;
         // v1 -> v2: Item.type, Submission.needOrderFlags 추가
@@ -184,6 +184,26 @@ export const useStore = create<Store>()(
             persisted.submissions = persisted.submissions.map((sub: any) => ({
               ...sub,
               needOrderFlags: sub.needOrderFlags ?? {},
+            }));
+          }
+        }
+        // v2 -> v3: Item.sortOrder 추가 (카테고리별로 createdAt 순서 유지)
+        if (version < 3) {
+          if (Array.isArray(persisted.items)) {
+            const counters: Record<string, number> = {};
+            const sorted = [...persisted.items].sort(
+              (a: any, b: any) => (a.createdAt ?? 0) - (b.createdAt ?? 0)
+            );
+            const orderById = new Map<string, number>();
+            for (const it of sorted) {
+              const c = it.category;
+              counters[c] = (counters[c] ?? 0);
+              orderById.set(it.id, counters[c]);
+              counters[c]++;
+            }
+            persisted.items = persisted.items.map((it: any) => ({
+              ...it,
+              sortOrder: it.sortOrder ?? orderById.get(it.id) ?? 0,
             }));
           }
         }
