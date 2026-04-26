@@ -191,7 +191,8 @@ export default function OwnerDashboard() {
       </Button>
 
       {!submission ||
-      Object.keys(submission.stock).length === 0 ? (
+      (Object.keys(submission.stock).length === 0 &&
+        Object.keys(submission.needOrderFlags ?? {}).length === 0) ? (
         <div className="card-warm p-8 text-center text-muted-foreground">
           <Package className="w-10 h-10 mx-auto mb-3 opacity-40" />
           <p className="text-sm">아직 매니저가 재고를 입력하지 않았습니다.</p>
@@ -202,6 +203,9 @@ export default function OwnerDashboard() {
           renderItem={renderItem}
           badgeFor={(_cat, list) => {
             const n = list.filter((it) => {
+              if (it.type === "needOrder") {
+                return !!submission!.needOrderFlags?.[it.id];
+              }
               const v = submission!.stock[it.id];
               return it.safetyStock > 0 && v !== undefined && v < it.safetyStock;
             }).length;
