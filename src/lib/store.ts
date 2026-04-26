@@ -9,6 +9,8 @@ interface Store extends AppState {
   addItem: (name: string, category: CategoryKey, safetyStock: number, type?: ItemType) => void;
   updateItem: (id: string, patch: Partial<Item>) => void;
   toggleActive: (id: string) => void;
+  /** 한 카테고리 내에서 itemId 배열 순서대로 sortOrder 재할당 */
+  reorderItems: (category: CategoryKey, orderedIds: string[]) => void;
 
   // submissions
   ensureCurrentSubmission: () => string;
@@ -38,30 +40,62 @@ export const useStore = create<Store>()(
       ...initial,
 
       addItem: (name, category, safetyStock, type = "quantity") =>
-        set((s) => ({
-          items: [
-            ...s.items,
-            {
-              id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-              name: name.trim(),
-              category,
-              safetyStock,
-              active: true,
-              createdAt: Date.now(),
-              type,
-            },
-          ],
-        })),
+        set((s) => {
+          const maxOrder = s.items
+            .filter((i) => i.category === category)
+            .reduce((m, i) => Math.max(m, i.sortOrder ?? 0), -1);
+          return {
+            items: [
+              ...s.items,
+              {
+                id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                name: name.trim(),
+                category,
+                safetyStock,
+                active: true,
+                createdAt: Date.now(),
+                type,
+                sortOrder: maxOrder + 1,
+              },
+            ],
+          };
+        }),
 
       updateItem: (id, patch) =>
-        set((s) => ({
-          items: s.items.map((i) => (i.id === id ? { ...i, ...patch } : i)),
-        })),
+        set((s) => {
+          const target = s.items.find((i) => i.id === id);
+          if (!target) return s;
+          // 카테고리가 변경되면 새 카테고리 맨 끝으로 이동
+          const movingCategory =
+            patch.category !== undefined && patch.category !== target.category;
+          const newSortOrder = movingCategory
+            ? s.items
+                .filter((i) => i.category === patch.category)
+                .reduce((m, i) => Math.max(m, i.sortOrder ?? 0), -1) + 1
+            : target.sortOrder;
+          return {
+            items: s.items.map((i) =>
+              i.id === id ? { ...i, ...patch, sortOrder: newSortOrder } : i
+            ),
+          };
+        }),
 
       toggleActive: (id) =>
         set((s) => ({
           items: s.items.map((i) => (i.id === id ? { ...i, active: !i.active } : i)),
         })),
+
+      reorderItems: (category, orderedIds) =>
+        set((s) => {
+          const orderMap = new Map(orderedIds.map((id, idx) => [id, idx]));
+          return {
+            items: s.items.map((i) =>
+              i.category === category && orderMap.has(i.id)
+                ? { ...i, sortOrder: orderMap.get(i.id)! }
+                : i
+            ),
+          };
+        }),
 
       ensureCurrentSubmission: () => {
         const weekDate = getSundayOfWeek();
@@ -135,7 +169,7 @@ export const useStore = create<Store>()(
     }),
     {
       name: "ninehill-inventory-v1",
-      version: 2,
+      version: 3,
       migrate: (persisted: any, version) => {
         if (!persisted) return persisted;
         // v1 -> v2: Item.type, Submission.needOrderFlags 추가
@@ -150,6 +184,26 @@ export const useStore = create<Store>()(
             persisted.submissions = persisted.submissions.map((sub: any) => ({
               ...sub,
               needOrderFlags: sub.needOrderFlags ?? {},
+            }));
+          }
+        }
+        // v2 -> v3: Item.sortOrder 추가 (카테고리별로 createdAt 순서 유지)
+        if (version < 3) {
+          if (Array.isArray(persisted.items)) {
+            const counters: Record<string, number> = {};
+            const sorted = [...persisted.items].sort(
+              (a: any, b: any) => (a.createdAt ?? 0) - (b.createdAt ?? 0)
+            );
+            const orderById = new Map<string, number>();
+            for (const it of sorted) {
+              const c = it.category;
+              counters[c] = (counters[c] ?? 0);
+              orderById.set(it.id, counters[c]);
+              counters[c]++;
+            }
+            persisted.items = persisted.items.map((it: any) => ({
+              ...it,
+              sortOrder: it.sortOrder ?? orderById.get(it.id) ?? 0,
             }));
           }
         }

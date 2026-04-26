@@ -116,6 +116,7 @@ export default function ItemsManagement() {
       </div>
 
       <CategoryAccordion
+        sortable
         items={visible}
         renderItem={(it) => (
           <div

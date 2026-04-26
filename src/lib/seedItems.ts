@@ -107,6 +107,7 @@ export function buildSeedItems(): Item[] {
   const out: Item[] = [];
   let i = 0;
   for (const group of seed) {
+    let order = 0;
     for (const name of group.names) {
       out.push({
         id: `seed-${i++}`,
@@ -116,6 +117,7 @@ export function buildSeedItems(): Item[] {
         active: true,
         createdAt: Date.now() + i,
         type: "quantity",
+        sortOrder: order++,
       });
     }
   }
