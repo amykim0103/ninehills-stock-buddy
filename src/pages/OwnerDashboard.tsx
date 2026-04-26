@@ -8,7 +8,7 @@ import { Navigate } from "react-router-dom";
 import { Item, OrderLine } from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { formatKoreanDate, formatQty } from "@/lib/utils-date";
+import { formatKoreanDate, formatQty, getSundayOfWeek } from "@/lib/utils-date";
 import { toast } from "sonner";
 import { Send, ShoppingCart, AlertCircle, Sparkles, Package } from "lucide-react";
 
