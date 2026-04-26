@@ -41,8 +41,6 @@ export default function ManagerDashboard() {
     }
   }, [ensureCurrentSubmission, getSubmission]);
 
-  if (role !== "manager") return <Navigate to="/" replace />;
-
   const submission = submissionId ? getSubmission(submissionId) : undefined;
   const activeItems = useMemo(() => items.filter((i) => i.active), [items]);
 
@@ -51,6 +49,8 @@ export default function ManagerDashboard() {
     if (!submission || submission.status === "stocked") return [];
     return submission.orders.filter((o) => !o.received && o.orderQty > 0);
   }, [submission]);
+
+  if (role !== "manager") return <Navigate to="/" replace />;
 
   const numericQty = (id: string): number => normalizeQty(qty[id] ?? "0");
 
