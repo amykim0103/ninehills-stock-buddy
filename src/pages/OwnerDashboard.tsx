@@ -157,6 +157,14 @@ export default function OwnerDashboard() {
           </div>
           <div className="space-y-1.5">
             {needBuyItems.map((it) => {
+              if (it.type === "needOrder") {
+                return (
+                  <div key={it.id} className="flex justify-between text-sm">
+                    <span className="truncate flex-1">{it.name}</span>
+                    <span className="text-accent font-semibold ml-2">주문필요</span>
+                  </div>
+                );
+              }
               const stock = submission?.stock[it.id] ?? 0;
               const rec = recommendOrderQty(stock, it.safetyStock);
               return (
