@@ -135,6 +135,26 @@ export const useStore = create<Store>()(
     }),
     {
       name: "ninehill-inventory-v1",
+      version: 2,
+      migrate: (persisted: any, version) => {
+        if (!persisted) return persisted;
+        // v1 -> v2: Item.type, Submission.needOrderFlags 추가
+        if (version < 2) {
+          if (Array.isArray(persisted.items)) {
+            persisted.items = persisted.items.map((it: any) => ({
+              ...it,
+              type: it.type ?? "quantity",
+            }));
+          }
+          if (Array.isArray(persisted.submissions)) {
+            persisted.submissions = persisted.submissions.map((sub: any) => ({
+              ...sub,
+              needOrderFlags: sub.needOrderFlags ?? {},
+            }));
+          }
+        }
+        return persisted;
+      },
     }
   )
 );
