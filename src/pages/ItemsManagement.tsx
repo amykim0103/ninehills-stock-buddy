@@ -1,7 +1,7 @@
 import { useState } from "react";
 import AppShell from "@/components/AppShell";
 import { useStore } from "@/lib/store";
-import { CATEGORIES, CategoryKey } from "@/lib/types";
+import { CATEGORIES, CategoryKey, ItemType } from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,14 +31,17 @@ export default function ItemsManagement() {
   const [name, setName] = useState("");
   const [cat, setCat] = useState<CategoryKey>("시럽");
   const [safety, setSafety] = useState("");
+  const [newType, setNewType] = useState<ItemType>("quantity");
 
   const visible = items.filter((i) => (showInactive ? true : i.active));
 
   const handleAdd = () => {
     if (!name.trim()) return toast.error("품목명을 입력해주세요");
-    addItem(name, cat, parseInt(safety || "0", 10) || 0);
+    const safetyNum = newType === "needOrder" ? 0 : parseInt(safety || "0", 10) || 0;
+    addItem(name, cat, safetyNum, newType);
     setName("");
     setSafety("");
+    setNewType("quantity");
     setOpen(false);
     toast.success(`${name} 추가됨`);
   };
