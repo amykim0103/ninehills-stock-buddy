@@ -3,8 +3,6 @@ import AppShell from "@/components/AppShell";
 import CategoryAccordion from "@/components/CategoryAccordion";
 import { NeedBuyBadge } from "@/components/NeedBuyBadge";
 import { useStore } from "@/lib/store";
-import { useSession } from "@/lib/session";
-import { Navigate, useNavigate } from "react-router-dom";
 import { Item } from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -14,8 +12,6 @@ import { toast } from "sonner";
 import { CheckCircle2, MessageSquarePlus, Truck, PackageCheck } from "lucide-react";
 
 export default function ManagerDashboard() {
-  const { role } = useSession();
-  const navigate = useNavigate();
   const {
     items,
     ensureCurrentSubmission,
@@ -49,8 +45,6 @@ export default function ManagerDashboard() {
     if (!submission || submission.status === "stocked") return [];
     return submission.orders.filter((o) => !o.received && o.orderQty > 0);
   }, [submission]);
-
-  if (role !== "manager") return <Navigate to="/" replace />;
 
   const numericQty = (id: string): number => normalizeQty(qty[id] ?? "0");
 
@@ -199,13 +193,6 @@ export default function ManagerDashboard() {
         <CheckCircle2 className="w-5 h-5 mr-2" />
         재고 저장
       </Button>
-
-      <button
-        onClick={() => navigate("/items")}
-        className="w-full mt-3 text-sm text-muted-foreground py-3"
-      >
-        + 품목 관리
-      </button>
     </AppShell>
   );
 }

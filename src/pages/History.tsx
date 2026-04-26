@@ -1,14 +1,11 @@
 import { useMemo, useState } from "react";
 import AppShell from "@/components/AppShell";
 import { useStore } from "@/lib/store";
-import { useSession } from "@/lib/session";
-import { Navigate } from "react-router-dom";
 import { formatKoreanDate, formatQty } from "@/lib/utils-date";
 import { ChevronRight, Calendar, ArrowLeft, Package, ShoppingCart, CheckCircle2 } from "lucide-react";
 import { Submission } from "@/lib/types";
 
 export default function History() {
-  const { role } = useSession();
   const { submissions, items } = useStore();
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -16,8 +13,6 @@ export default function History() {
     () => [...submissions].sort((a, b) => b.weekDate.localeCompare(a.weekDate)),
     [submissions]
   );
-
-  if (!role) return <Navigate to="/" replace />;
 
   if (selectedId) {
     const sub = submissions.find((s) => s.id === selectedId);

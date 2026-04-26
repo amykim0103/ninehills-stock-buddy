@@ -1,5 +1,3 @@
-export type Role = "owner" | "manager";
-
 export type CategoryKey =
   | "시럽"
   | "파우더&소스류"
@@ -57,8 +55,6 @@ export interface Submission {
 }
 
 export interface AppState {
-  managerPin: string;
-  ownerPassword: string;
   items: Item[];
   submissions: Submission[];
 }

@@ -5,17 +5,12 @@ import { buildSeedItems } from "./seedItems";
 import { getSundayOfWeek } from "./utils-date";
 
 interface Store extends AppState {
-  // auth
-  setManagerPin: (pin: string) => void;
-  setOwnerPassword: (pw: string) => void;
-
   // items
   addItem: (name: string, category: CategoryKey, safetyStock: number) => void;
   updateItem: (id: string, patch: Partial<Item>) => void;
   toggleActive: (id: string) => void;
 
   // submissions
-  /** 이번 주 일요일 기준 제출이 없으면 생성하고 id 반환, 있으면 기존 id */
   ensureCurrentSubmission: () => string;
   getSubmission: (id: string) => Submission | undefined;
   getCurrentSubmission: () => Submission | undefined;
@@ -32,8 +27,6 @@ interface Store extends AppState {
 }
 
 const initial: AppState = {
-  managerPin: "1234",
-  ownerPassword: "0000",
   items: buildSeedItems(),
   submissions: [],
 };
@@ -42,9 +35,6 @@ export const useStore = create<Store>()(
   persist(
     (set, get) => ({
       ...initial,
-
-      setManagerPin: (pin) => set({ managerPin: pin }),
-      setOwnerPassword: (pw) => set({ ownerPassword: pw }),
 
       addItem: (name, category, safetyStock) =>
         set((s) => ({
