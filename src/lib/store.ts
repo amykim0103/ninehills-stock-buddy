@@ -1,12 +1,12 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import { AppState, Item, Submission, CategoryKey, OrderLine } from "./types";
+import { AppState, Item, Submission, CategoryKey, OrderLine, ItemType } from "./types";
 import { buildSeedItems } from "./seedItems";
 import { getSundayOfWeek } from "./utils-date";
 
 interface Store extends AppState {
   // items
-  addItem: (name: string, category: CategoryKey, safetyStock: number) => void;
+  addItem: (name: string, category: CategoryKey, safetyStock: number, type?: ItemType) => void;
   updateItem: (id: string, patch: Partial<Item>) => void;
   toggleActive: (id: string) => void;
 
@@ -17,6 +17,7 @@ interface Store extends AppState {
   saveStockEntry: (
     submissionId: string,
     stock: Record<string, number>,
+    needOrderFlags: Record<string, boolean>,
     itemMemos: Record<string, string>,
     generalMemo: string
   ) => void;
@@ -36,7 +37,7 @@ export const useStore = create<Store>()(
     (set, get) => ({
       ...initial,
 
-      addItem: (name, category, safetyStock) =>
+      addItem: (name, category, safetyStock, type = "quantity") =>
         set((s) => ({
           items: [
             ...s.items,
@@ -47,6 +48,7 @@ export const useStore = create<Store>()(
               safetyStock,
               active: true,
               createdAt: Date.now(),
+              type,
             },
           ],
         })),
@@ -70,6 +72,7 @@ export const useStore = create<Store>()(
           weekDate,
           createdAt: Date.now(),
           stock: {},
+          needOrderFlags: {},
           itemMemos: {},
           generalMemo: "",
           status: "stocked",
@@ -86,11 +89,11 @@ export const useStore = create<Store>()(
         return get().submissions.find((s) => s.weekDate === weekDate);
       },
 
-      saveStockEntry: (submissionId, stock, itemMemos, generalMemo) =>
+      saveStockEntry: (submissionId, stock, needOrderFlags, itemMemos, generalMemo) =>
         set((s) => ({
           submissions: s.submissions.map((sub) =>
             sub.id === submissionId
-              ? { ...sub, stock, itemMemos, generalMemo, status: "stocked" }
+              ? { ...sub, stock, needOrderFlags, itemMemos, generalMemo, status: "stocked" }
               : sub
           ),
         })),

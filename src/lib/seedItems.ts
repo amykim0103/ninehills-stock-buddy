@@ -115,6 +115,7 @@ export function buildSeedItems(): Item[] {
         safetyStock: 0,
         active: true,
         createdAt: Date.now() + i,
+        type: "quantity",
       });
     }
   }
