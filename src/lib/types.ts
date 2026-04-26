@@ -35,6 +35,8 @@ export interface Item {
   active: boolean;
   createdAt: number;
   type: ItemType;
+  /** 카테고리 내 정렬 순서 (작을수록 위) */
+  sortOrder: number;
 }
 
 export type SubmissionStatus = "stocked" | "ordered" | "completed";
