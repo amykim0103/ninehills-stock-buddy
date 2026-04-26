@@ -1,8 +1,6 @@
 import { useState } from "react";
 import AppShell from "@/components/AppShell";
 import { useStore } from "@/lib/store";
-import { useSession } from "@/lib/session";
-import { Navigate } from "react-router-dom";
 import { CATEGORIES, CategoryKey } from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -15,7 +13,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Plus, Eye, EyeOff, Lock } from "lucide-react";
+import { Plus, Eye, EyeOff } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -27,21 +25,12 @@ import {
 import CategoryAccordion from "@/components/CategoryAccordion";
 
 export default function ItemsManagement() {
-  const { role } = useSession();
-  const { items, addItem, updateItem, toggleActive, managerPin, ownerPassword, setManagerPin, setOwnerPassword } =
-    useStore();
+  const { items, addItem, updateItem, toggleActive } = useStore();
   const [showInactive, setShowInactive] = useState(false);
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [cat, setCat] = useState<CategoryKey>("시럽");
   const [safety, setSafety] = useState("");
-
-  // 비번/PIN 변경
-  const [credOpen, setCredOpen] = useState(false);
-  const [newManagerPin, setNewManagerPin] = useState("");
-  const [newOwnerPw, setNewOwnerPw] = useState("");
-
-  if (!role) return <Navigate to="/" replace />;
 
   const visible = items.filter((i) => (showInactive ? true : i.active));
 
@@ -52,19 +41,6 @@ export default function ItemsManagement() {
     setSafety("");
     setOpen(false);
     toast.success(`${name} 추가됨`);
-  };
-
-  const saveCreds = () => {
-    if (newManagerPin && /^\d{4,8}$/.test(newManagerPin)) {
-      setManagerPin(newManagerPin);
-    }
-    if (newOwnerPw) {
-      setOwnerPassword(newOwnerPw);
-    }
-    toast.success("저장되었습니다");
-    setCredOpen(false);
-    setNewManagerPin("");
-    setNewOwnerPw("");
   };
 
   return (
@@ -164,48 +140,6 @@ export default function ItemsManagement() {
           </div>
         )}
       />
-
-      <Dialog open={credOpen} onOpenChange={setCredOpen}>
-        <DialogTrigger asChild>
-          <button className="w-full mt-6 text-xs text-muted-foreground flex items-center justify-center gap-1.5 py-3">
-            <Lock className="w-3.5 h-3.5" />
-            로그인 정보 변경
-          </button>
-        </DialogTrigger>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>비밀번호 변경</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div>
-              <label className="text-xs text-muted-foreground">매니저 PIN (현재: {managerPin})</label>
-              <Input
-                type="password"
-                inputMode="numeric"
-                value={newManagerPin}
-                onChange={(e) => setNewManagerPin(e.target.value.replace(/\D/g, "").slice(0, 8))}
-                placeholder="새 PIN (4~8자리 숫자)"
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground">대표 비밀번호 (현재: {ownerPassword})</label>
-              <Input
-                type="password"
-                value={newOwnerPw}
-                onChange={(e) => setNewOwnerPw(e.target.value)}
-                placeholder="새 비밀번호"
-                className="mt-1"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button onClick={saveCreds} className="w-full bg-primary text-primary-foreground">
-              저장
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </AppShell>
   );
 }

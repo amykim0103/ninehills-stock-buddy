@@ -3,8 +3,6 @@ import AppShell from "@/components/AppShell";
 import CategoryAccordion from "@/components/CategoryAccordion";
 import { NeedBuyBadge } from "@/components/NeedBuyBadge";
 import { useStore, recommendOrderQty } from "@/lib/store";
-import { useSession } from "@/lib/session";
-import { Navigate } from "react-router-dom";
 import { Item, OrderLine } from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -13,7 +11,6 @@ import { toast } from "sonner";
 import { Send, ShoppingCart, AlertCircle, Sparkles, Package } from "lucide-react";
 
 export default function OwnerDashboard() {
-  const { role } = useSession();
   const items = useStore((s) => s.items);
   const saveOrders = useStore((s) => s.saveOrders);
   const ensureCurrentSubmission = useStore((s) => s.ensureCurrentSubmission);
@@ -64,8 +61,6 @@ export default function OwnerDashboard() {
       return it.safetyStock > 0 && v !== undefined && v < it.safetyStock;
     });
   }, [activeItems, submission]);
-
-  if (role !== "owner") return <Navigate to="/" replace />;
 
   const handleSubmit = () => {
     if (!submission) return;

@@ -5,7 +5,6 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Index from "./pages/Index.tsx";
 import NotFound from "./pages/NotFound.tsx";
-import ManagerDashboard from "./pages/ManagerDashboard.tsx";
 import OwnerDashboard from "./pages/OwnerDashboard.tsx";
 import ItemsManagement from "./pages/ItemsManagement.tsx";
 import History from "./pages/History.tsx";
@@ -20,8 +19,7 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
-          <Route path="/manager" element={<ManagerDashboard />} />
-          <Route path="/owner" element={<OwnerDashboard />} />
+          <Route path="/order" element={<OwnerDashboard />} />
           <Route path="/items" element={<ItemsManagement />} />
           <Route path="/history" element={<History />} />
           <Route path="*" element={<NotFound />} />
