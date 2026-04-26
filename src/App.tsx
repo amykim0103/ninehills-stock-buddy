@@ -8,6 +8,7 @@ import NotFound from "./pages/NotFound.tsx";
 import OwnerDashboard from "./pages/OwnerDashboard.tsx";
 import ItemsManagement from "./pages/ItemsManagement.tsx";
 import History from "./pages/History.tsx";
+import Recipes from "./pages/Recipes.tsx";
 
 const queryClient = new QueryClient();
 
@@ -22,6 +23,7 @@ const App = () => (
           <Route path="/order" element={<OwnerDashboard />} />
           <Route path="/items" element={<ItemsManagement />} />
           <Route path="/history" element={<History />} />
+          <Route path="/recipes" element={<Recipes />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

@@ -30,6 +30,17 @@ export default function AppShell({ children, title }: Props) {
             <div className="text-base font-semibold leading-tight">{title ?? "나인힐 재고"}</div>
           </div>
         </div>
+        <div className="flex px-5 gap-1 border-t border-border/60">
+          <div className="px-3 py-2.5 text-sm font-semibold text-foreground border-b-2 border-primary -mb-px">
+            재고현황
+          </div>
+          <Link
+            to="/recipes"
+            className="px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            레시피
+          </Link>
+        </div>
       </header>
 
       <main className="flex-1 px-4 py-5">{children}</main>
