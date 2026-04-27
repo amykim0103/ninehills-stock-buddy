@@ -1,19 +1,24 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
 import { AppState, Item, Submission, CategoryKey, OrderLine, ItemType } from "./types";
 import { buildSeedItems } from "./seedItems";
 import { getSundayOfWeek } from "./utils-date";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Store extends AppState {
+  /** 초기 로딩 상태 */
+  loading: boolean;
+  initialized: boolean;
+  /** Supabase 데이터 로드 + Realtime 구독 */
+  init: () => Promise<void>;
+
   // items
-  addItem: (name: string, category: CategoryKey, safetyStock: number, type?: ItemType) => void;
-  updateItem: (id: string, patch: Partial<Item>) => void;
-  toggleActive: (id: string) => void;
-  /** 한 카테고리 내에서 itemId 배열 순서대로 sortOrder 재할당 */
-  reorderItems: (category: CategoryKey, orderedIds: string[]) => void;
+  addItem: (name: string, category: CategoryKey, safetyStock: number, type?: ItemType) => Promise<void>;
+  updateItem: (id: string, patch: Partial<Item>) => Promise<void>;
+  toggleActive: (id: string) => Promise<void>;
+  reorderItems: (category: CategoryKey, orderedIds: string[]) => Promise<void>;
 
   // submissions
-  ensureCurrentSubmission: () => string;
+  ensureCurrentSubmission: () => Promise<string>;
   getSubmission: (id: string) => Submission | undefined;
   getCurrentSubmission: () => Submission | undefined;
   saveStockEntry: (
@@ -22,196 +27,318 @@ interface Store extends AppState {
     needOrderFlags: Record<string, boolean>,
     itemMemos: Record<string, string>,
     generalMemo: string
-  ) => void;
-  saveOrders: (submissionId: string, orders: OrderLine[]) => void;
-  receiveOrderLine: (submissionId: string, itemId: string) => void;
-
-  resetAll: () => void;
+  ) => Promise<void>;
+  saveOrders: (submissionId: string, orders: OrderLine[]) => Promise<void>;
+  receiveOrderLine: (submissionId: string, itemId: string) => Promise<void>;
 }
 
-const initial: AppState = {
-  items: buildSeedItems(),
-  submissions: [],
-};
+// ===== DB row <-> 앱 모델 변환 =====
+// DB 컬럼: snake_case  / 앱 모델: camelCase
+function rowToItem(r: any): Item {
+  return {
+    id: r.id,
+    name: r.name,
+    category: r.category as CategoryKey,
+    safetyStock: r.safety_stock ?? 0,
+    active: r.active,
+    type: (r.type ?? "quantity") as ItemType,
+    sortOrder: r.sort_order ?? 0,
+    createdAt: new Date(r.created_at).getTime(),
+  };
+}
 
-export const useStore = create<Store>()(
-  persist(
-    (set, get) => ({
-      ...initial,
+function rowToSubmission(r: any): Submission {
+  return {
+    id: r.id,
+    weekDate: r.week_date,
+    createdAt: new Date(r.created_at).getTime(),
+    stock: r.stock ?? {},
+    needOrderFlags: r.need_order_flags ?? {},
+    itemMemos: r.item_memos ?? {},
+    generalMemo: r.general_memo ?? "",
+    status: r.status,
+    orders: r.orders ?? [],
+    orderedAt: r.ordered_at ? new Date(r.ordered_at).getTime() : undefined,
+  };
+}
 
-      addItem: (name, category, safetyStock, type = "quantity") =>
-        set((s) => {
-          const maxOrder = s.items
-            .filter((i) => i.category === category)
-            .reduce((m, i) => Math.max(m, i.sortOrder ?? 0), -1);
-          return {
-            items: [
-              ...s.items,
-              {
-                id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-                name: name.trim(),
-                category,
-                safetyStock,
-                active: true,
-                createdAt: Date.now(),
-                type,
-                sortOrder: maxOrder + 1,
-              },
-            ],
-          };
-        }),
+const initial: AppState = { items: [], submissions: [] };
 
-      updateItem: (id, patch) =>
-        set((s) => {
-          const target = s.items.find((i) => i.id === id);
-          if (!target) return s;
-          // 카테고리가 변경되면 새 카테고리 맨 끝으로 이동
-          const movingCategory =
-            patch.category !== undefined && patch.category !== target.category;
-          const newSortOrder = movingCategory
-            ? s.items
-                .filter((i) => i.category === patch.category)
-                .reduce((m, i) => Math.max(m, i.sortOrder ?? 0), -1) + 1
-            : target.sortOrder;
-          return {
-            items: s.items.map((i) =>
-              i.id === id ? { ...i, ...patch, sortOrder: newSortOrder } : i
-            ),
-          };
-        }),
+export const useStore = create<Store>()((set, get) => ({
+  ...initial,
+  loading: false,
+  initialized: false,
 
-      toggleActive: (id) =>
-        set((s) => ({
-          items: s.items.map((i) => (i.id === id ? { ...i, active: !i.active } : i)),
-        })),
+  init: async () => {
+    if (get().initialized) return;
+    set({ loading: true, initialized: true });
 
-      reorderItems: (category, orderedIds) =>
-        set((s) => {
-          const orderMap = new Map(orderedIds.map((id, idx) => [id, idx]));
-          return {
-            items: s.items.map((i) =>
-              i.category === category && orderMap.has(i.id)
-                ? { ...i, sortOrder: orderMap.get(i.id)! }
-                : i
-            ),
-          };
-        }),
+    // 1) 초기 로드
+    const [itemsRes, subsRes] = await Promise.all([
+      supabase.from("items").select("*"),
+      supabase.from("submissions").select("*"),
+    ]);
 
-      ensureCurrentSubmission: () => {
-        const weekDate = getSundayOfWeek();
-        const existing = get().submissions.find((s) => s.weekDate === weekDate);
-        if (existing) return existing.id;
-        const sub: Submission = {
-          id: `sub-${Date.now()}`,
-          weekDate,
-          createdAt: Date.now(),
+    let items = (itemsRes.data ?? []).map(rowToItem);
+    const submissions = (subsRes.data ?? []).map(rowToSubmission);
+
+    // 2) DB가 비어있으면 시드 데이터 자동 입력
+    if (items.length === 0) {
+      const seedRows = buildSeedItems().map((it) => ({
+        name: it.name,
+        category: it.category,
+        safety_stock: it.safetyStock,
+        active: it.active,
+        type: it.type,
+        sort_order: it.sortOrder,
+      }));
+      const { data: inserted } = await supabase
+        .from("items")
+        .insert(seedRows)
+        .select("*");
+      items = (inserted ?? []).map(rowToItem);
+    }
+
+    set({ items, submissions, loading: false });
+
+    // 3) Realtime 구독
+    supabase
+      .channel("items-changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "items" },
+        (payload) => {
+          set((s) => {
+            if (payload.eventType === "DELETE") {
+              return { items: s.items.filter((i) => i.id !== (payload.old as any).id) };
+            }
+            const next = rowToItem(payload.new);
+            const exists = s.items.some((i) => i.id === next.id);
+            return {
+              items: exists
+                ? s.items.map((i) => (i.id === next.id ? next : i))
+                : [...s.items, next],
+            };
+          });
+        }
+      )
+      .subscribe();
+
+    supabase
+      .channel("submissions-changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "submissions" },
+        (payload) => {
+          set((s) => {
+            if (payload.eventType === "DELETE") {
+              return {
+                submissions: s.submissions.filter(
+                  (x) => x.id !== (payload.old as any).id
+                ),
+              };
+            }
+            const next = rowToSubmission(payload.new);
+            const exists = s.submissions.some((x) => x.id === next.id);
+            return {
+              submissions: exists
+                ? s.submissions.map((x) => (x.id === next.id ? next : x))
+                : [...s.submissions, next],
+            };
+          });
+        }
+      )
+      .subscribe();
+  },
+
+  addItem: async (name, category, safetyStock, type = "quantity") => {
+    const maxOrder = get()
+      .items.filter((i) => i.category === category)
+      .reduce((m, i) => Math.max(m, i.sortOrder ?? 0), -1);
+    const { data, error } = await supabase
+      .from("items")
+      .insert({
+        name: name.trim(),
+        category,
+        safety_stock: safetyStock,
+        active: true,
+        type,
+        sort_order: maxOrder + 1,
+      })
+      .select("*")
+      .single();
+    if (error) throw error;
+    if (data) {
+      const it = rowToItem(data);
+      set((s) =>
+        s.items.some((x) => x.id === it.id)
+          ? s
+          : { items: [...s.items, it] }
+      );
+    }
+  },
+
+  updateItem: async (id, patch) => {
+    const target = get().items.find((i) => i.id === id);
+    if (!target) return;
+    const movingCategory =
+      patch.category !== undefined && patch.category !== target.category;
+    const newSortOrder = movingCategory
+      ? get()
+          .items.filter((i) => i.category === patch.category)
+          .reduce((m, i) => Math.max(m, i.sortOrder ?? 0), -1) + 1
+      : target.sortOrder;
+
+    const dbPatch: any = {};
+    if (patch.name !== undefined) dbPatch.name = patch.name;
+    if (patch.category !== undefined) dbPatch.category = patch.category;
+    if (patch.safetyStock !== undefined) dbPatch.safety_stock = patch.safetyStock;
+    if (patch.active !== undefined) dbPatch.active = patch.active;
+    if (patch.type !== undefined) dbPatch.type = patch.type;
+    dbPatch.sort_order = newSortOrder;
+
+    // 낙관적 업데이트
+    set((s) => ({
+      items: s.items.map((i) =>
+        i.id === id ? { ...i, ...patch, sortOrder: newSortOrder } : i
+      ),
+    }));
+    await supabase.from("items").update(dbPatch).eq("id", id);
+  },
+
+  toggleActive: async (id) => {
+    const target = get().items.find((i) => i.id === id);
+    if (!target) return;
+    const next = !target.active;
+    set((s) => ({
+      items: s.items.map((i) => (i.id === id ? { ...i, active: next } : i)),
+    }));
+    await supabase.from("items").update({ active: next }).eq("id", id);
+  },
+
+  reorderItems: async (category, orderedIds) => {
+    const orderMap = new Map(orderedIds.map((id, idx) => [id, idx]));
+    set((s) => ({
+      items: s.items.map((i) =>
+        i.category === category && orderMap.has(i.id)
+          ? { ...i, sortOrder: orderMap.get(i.id)! }
+          : i
+      ),
+    }));
+    // 일괄 업데이트
+    await Promise.all(
+      orderedIds.map((id, idx) =>
+        supabase.from("items").update({ sort_order: idx }).eq("id", id)
+      )
+    );
+  },
+
+  ensureCurrentSubmission: async () => {
+    const weekDate = getSundayOfWeek();
+    const existing = get().submissions.find((s) => s.weekDate === weekDate);
+    if (existing) return existing.id;
+
+    // upsert로 동시성 방지
+    const { data, error } = await supabase
+      .from("submissions")
+      .upsert(
+        {
+          week_date: weekDate,
           stock: {},
-          needOrderFlags: {},
-          itemMemos: {},
-          generalMemo: "",
+          need_order_flags: {},
+          item_memos: {},
+          general_memo: "",
           status: "stocked",
           orders: [],
-        };
-        set((s) => ({ submissions: [...s.submissions, sub] }));
-        return sub.id;
-      },
+        },
+        { onConflict: "week_date", ignoreDuplicates: false }
+      )
+      .select("*")
+      .single();
+    if (error) throw error;
+    const sub = rowToSubmission(data);
+    set((s) =>
+      s.submissions.some((x) => x.id === sub.id)
+        ? s
+        : { submissions: [...s.submissions, sub] }
+    );
+    return sub.id;
+  },
 
-      getSubmission: (id) => get().submissions.find((s) => s.id === id),
+  getSubmission: (id) => get().submissions.find((s) => s.id === id),
 
-      getCurrentSubmission: () => {
-        const weekDate = getSundayOfWeek();
-        return get().submissions.find((s) => s.weekDate === weekDate);
-      },
+  getCurrentSubmission: () => {
+    const weekDate = getSundayOfWeek();
+    return get().submissions.find((s) => s.weekDate === weekDate);
+  },
 
-      saveStockEntry: (submissionId, stock, needOrderFlags, itemMemos, generalMemo) =>
-        set((s) => ({
-          submissions: s.submissions.map((sub) =>
-            sub.id === submissionId
-              ? { ...sub, stock, needOrderFlags, itemMemos, generalMemo, status: "stocked" }
-              : sub
-          ),
-        })),
+  saveStockEntry: async (submissionId, stock, needOrderFlags, itemMemos, generalMemo) => {
+    set((s) => ({
+      submissions: s.submissions.map((sub) =>
+        sub.id === submissionId
+          ? { ...sub, stock, needOrderFlags, itemMemos, generalMemo, status: "stocked" }
+          : sub
+      ),
+    }));
+    await supabase
+      .from("submissions")
+      .update({
+        stock,
+        need_order_flags: needOrderFlags,
+        item_memos: itemMemos,
+        general_memo: generalMemo,
+        status: "stocked",
+      })
+      .eq("id", submissionId);
+  },
 
-      saveOrders: (submissionId, orders) =>
-        set((s) => ({
-          submissions: s.submissions.map((sub) =>
-            sub.id === submissionId
-              ? { ...sub, orders, status: "ordered", orderedAt: Date.now() }
-              : sub
-          ),
-        })),
+  saveOrders: async (submissionId, orders) => {
+    const orderedAt = Date.now();
+    set((s) => ({
+      submissions: s.submissions.map((sub) =>
+        sub.id === submissionId
+          ? { ...sub, orders, status: "ordered", orderedAt }
+          : sub
+      ),
+    }));
+    await supabase
+      .from("submissions")
+      .update({
+        orders: orders as any,
+        status: "ordered",
+        ordered_at: new Date(orderedAt).toISOString(),
+      })
+      .eq("id", submissionId);
+  },
 
-      receiveOrderLine: (submissionId, itemId) => {
-        const sub = get().submissions.find((s) => s.id === submissionId);
-        if (!sub) return;
-        const line = sub.orders.find((o) => o.itemId === itemId);
-        if (!line || line.received) return;
-        const newOrders = sub.orders.map((o) =>
-          o.itemId === itemId ? { ...o, received: true } : o
-        );
-        const newStock = { ...sub.stock, [itemId]: (sub.stock[itemId] ?? 0) + line.orderQty };
-        const allReceived = newOrders.every((o) => o.received);
-        set((s) => ({
-          submissions: s.submissions.map((x) =>
-            x.id === submissionId
-              ? {
-                  ...x,
-                  orders: newOrders,
-                  stock: newStock,
-                  status: allReceived ? "completed" : "ordered",
-                }
-              : x
-          ),
-        }));
-      },
-
-      resetAll: () => set({ ...initial }),
-    }),
-    {
-      name: "ninehill-inventory-v1",
-      version: 3,
-      migrate: (persisted: any, version) => {
-        if (!persisted) return persisted;
-        // v1 -> v2: Item.type, Submission.needOrderFlags 추가
-        if (version < 2) {
-          if (Array.isArray(persisted.items)) {
-            persisted.items = persisted.items.map((it: any) => ({
-              ...it,
-              type: it.type ?? "quantity",
-            }));
-          }
-          if (Array.isArray(persisted.submissions)) {
-            persisted.submissions = persisted.submissions.map((sub: any) => ({
-              ...sub,
-              needOrderFlags: sub.needOrderFlags ?? {},
-            }));
-          }
-        }
-        // v2 -> v3: Item.sortOrder 추가 (카테고리별로 createdAt 순서 유지)
-        if (version < 3) {
-          if (Array.isArray(persisted.items)) {
-            const counters: Record<string, number> = {};
-            const sorted = [...persisted.items].sort(
-              (a: any, b: any) => (a.createdAt ?? 0) - (b.createdAt ?? 0)
-            );
-            const orderById = new Map<string, number>();
-            for (const it of sorted) {
-              const c = it.category;
-              counters[c] = (counters[c] ?? 0);
-              orderById.set(it.id, counters[c]);
-              counters[c]++;
-            }
-            persisted.items = persisted.items.map((it: any) => ({
-              ...it,
-              sortOrder: it.sortOrder ?? orderById.get(it.id) ?? 0,
-            }));
-          }
-        }
-        return persisted;
-      },
-    }
-  )
-);
+  receiveOrderLine: async (submissionId, itemId) => {
+    const sub = get().submissions.find((s) => s.id === submissionId);
+    if (!sub) return;
+    const line = sub.orders.find((o) => o.itemId === itemId);
+    if (!line || line.received) return;
+    const newOrders = sub.orders.map((o) =>
+      o.itemId === itemId ? { ...o, received: true } : o
+    );
+    const newStock = { ...sub.stock, [itemId]: (sub.stock[itemId] ?? 0) + line.orderQty };
+    const allReceived = newOrders.every((o) => o.received);
+    const newStatus = allReceived ? "completed" : "ordered";
+    set((s) => ({
+      submissions: s.submissions.map((x) =>
+        x.id === submissionId
+          ? { ...x, orders: newOrders, stock: newStock, status: newStatus }
+          : x
+      ),
+    }));
+    await supabase
+      .from("submissions")
+      .update({
+        orders: newOrders as any,
+        stock: newStock,
+        status: newStatus,
+      })
+      .eq("id", submissionId);
+  },
+}));
 
 /** 자동 추천: 안전재고 - 현재재고 (>0) */
 export function recommendOrderQty(stock: number, safety: number): number {

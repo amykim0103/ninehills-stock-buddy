@@ -29,15 +29,17 @@ export default function ManagerDashboard() {
   const [generalMemo, setGeneralMemo] = useState("");
 
   useEffect(() => {
-    const id = ensureCurrentSubmission();
-    setSubmissionId(id);
-    const sub = getSubmission(id);
-    if (sub) {
-      setQty(Object.fromEntries(Object.entries(sub.stock).map(([k, v]) => [k, String(v)])));
-      setNeedOrder(sub.needOrderFlags ?? {});
-      setMemos(sub.itemMemos);
-      setGeneralMemo(sub.generalMemo);
-    }
+    (async () => {
+      const id = await ensureCurrentSubmission();
+      setSubmissionId(id);
+      const sub = getSubmission(id);
+      if (sub) {
+        setQty(Object.fromEntries(Object.entries(sub.stock).map(([k, v]) => [k, String(v)])));
+        setNeedOrder(sub.needOrderFlags ?? {});
+        setMemos(sub.itemMemos);
+        setGeneralMemo(sub.generalMemo);
+      }
+    })();
   }, [ensureCurrentSubmission, getSubmission]);
 
   const submission = submissionId ? getSubmission(submissionId) : undefined;

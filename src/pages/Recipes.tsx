@@ -38,10 +38,10 @@ export default function Recipes() {
   };
 
   const handleAdd = () => {
-    requestPassword(() => {
+    requestPassword(async () => {
       const targetCategory: RecipeCategory =
         active === "전체" ? "Signature" : (active as RecipeCategory);
-      const id = addRecipe(targetCategory);
+      const id = await addRecipe(targetCategory);
       setEditingId(id);
       if (active === "전체") setActive(targetCategory);
     });
