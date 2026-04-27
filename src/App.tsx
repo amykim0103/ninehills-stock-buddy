@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -9,10 +10,17 @@ import OwnerDashboard from "./pages/OwnerDashboard.tsx";
 import ItemsManagement from "./pages/ItemsManagement.tsx";
 import History from "./pages/History.tsx";
 import Recipes from "./pages/Recipes.tsx";
+import { useStore } from "@/lib/store";
+import { useRecipeStore } from "@/lib/recipeStore";
 
 const queryClient = new QueryClient();
 
-const App = () => (
+const App = () => {
+  useEffect(() => {
+    useStore.getState().init();
+    useRecipeStore.getState().init();
+  }, []);
+  return (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
@@ -29,6 +37,7 @@ const App = () => (
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
-);
+  );
+};
 
 export default App;
