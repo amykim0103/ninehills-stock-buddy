@@ -14,7 +14,117 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      items: {
+        Row: {
+          active: boolean
+          category: string
+          created_at: string
+          id: string
+          name: string
+          safety_stock: number
+          sort_order: number
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          category: string
+          created_at?: string
+          id?: string
+          name: string
+          safety_stock?: number
+          sort_order?: number
+          type?: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          category?: string
+          created_at?: string
+          id?: string
+          name?: string
+          safety_stock?: number
+          sort_order?: number
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      recipes: {
+        Row: {
+          active: boolean
+          category: string
+          created_at: string
+          id: string
+          name: string
+          sort_order: number
+          updated_at: string
+          variants: Json
+        }
+        Insert: {
+          active?: boolean
+          category: string
+          created_at?: string
+          id?: string
+          name: string
+          sort_order?: number
+          updated_at?: string
+          variants?: Json
+        }
+        Update: {
+          active?: boolean
+          category?: string
+          created_at?: string
+          id?: string
+          name?: string
+          sort_order?: number
+          updated_at?: string
+          variants?: Json
+        }
+        Relationships: []
+      }
+      submissions: {
+        Row: {
+          created_at: string
+          general_memo: string
+          id: string
+          item_memos: Json
+          need_order_flags: Json
+          ordered_at: string | null
+          orders: Json
+          status: string
+          stock: Json
+          updated_at: string
+          week_date: string
+        }
+        Insert: {
+          created_at?: string
+          general_memo?: string
+          id?: string
+          item_memos?: Json
+          need_order_flags?: Json
+          ordered_at?: string | null
+          orders?: Json
+          status?: string
+          stock?: Json
+          updated_at?: string
+          week_date: string
+        }
+        Update: {
+          created_at?: string
+          general_memo?: string
+          id?: string
+          item_memos?: Json
+          need_order_flags?: Json
+          ordered_at?: string | null
+          orders?: Json
+          status?: string
+          stock?: Json
+          updated_at?: string
+          week_date?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
