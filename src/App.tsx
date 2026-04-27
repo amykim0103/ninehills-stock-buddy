@@ -17,6 +17,15 @@ const queryClient = new QueryClient();
 
 const App = () => {
   useEffect(() => {
+    // 과거 localStorage 잔여 데이터 일회성 정리 (Supabase로 완전 이전)
+    try {
+      if (!localStorage.getItem("ninehill-cleanup-v1")) {
+        ["ninehill-recipes-v1", "ninehill-store-v1", "ninehill-store"].forEach(
+          (k) => localStorage.removeItem(k)
+        );
+        localStorage.setItem("ninehill-cleanup-v1", "1");
+      }
+    } catch {}
     useStore.getState().init();
     useRecipeStore.getState().init();
   }, []);
